@@ -53,6 +53,8 @@
 
 - (void)postButtonClick:(UIButton*)btn
 {
+    NSLog(@"postButtonClick lyznotification before  Time:%f",[[NSDate date] timeIntervalSince1970]);
+    
     [[NSNotificationCenter defaultCenter] postNotificationName:@"lyznotification" object:nil];
     //    [[NSNotificationCenter defaultCenter] postNotificationName:@"lyznotification" object:self];
     //    [[NSNotificationCenter defaultCenter] postNotificationName:@"lyznotification" object:self userInfo:@{@"key":@"liyizhen"}];
@@ -60,7 +62,7 @@
     //    dispatch_async(dispatch_get_global_queue(0, 0), ^{
     //      [[NSNotificationCenter defaultCenter] postNotificationName:@"xyznotification" object:nil];
     //    });
-    NSLog(@"postButtonClick lyznotification  Time:%f",[[NSDate date] timeIntervalSince1970]);
+    NSLog(@"postButtonClick lyznotification After Time:%f",[[NSDate date] timeIntervalSince1970]);
 }
 
 - (void)testButtonClick:(UIButton*)btn

@@ -7,6 +7,7 @@
 //
 
 #import "AppDelegate.h"
+#include <execinfo.h>
 
 @interface AppDelegate ()
 
@@ -17,8 +18,74 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
-    
+    InstallSignalHandler();//信号量截断
+    InstallUncaughtExceptionHandler();//系统异常捕获
     return YES;
+}
+
+void SignalExceptionHandler(int signal)
+{
+    NSMutableString *mstr = [[NSMutableString alloc] init];
+    [mstr appendString:@"Stack:\n"];
+    void* callstack[128];
+    int i, frames = backtrace(callstack, 128);
+    char** strs = backtrace_symbols(callstack, frames);
+    for (i = 0; i <frames; ++i) {
+        [mstr appendFormat:@"%s\n", strs[i]];
+    }
+    
+    NSLog(@"callBack%@",mstr);
+}
+
+
+void InstallSignalHandler(void)
+{
+    signal(SIGHUP, SignalExceptionHandler);
+    signal(SIGINT, SignalExceptionHandler);
+    signal(SIGQUIT, SignalExceptionHandler);
+    
+    signal(SIGTRAP, SignalExceptionHandler);
+    signal(SIGABRT, SignalExceptionHandler);
+    signal(SIGILL, SignalExceptionHandler);
+    signal(SIGSEGV, SignalExceptionHandler);
+    signal(SIGFPE, SignalExceptionHandler);
+    signal(SIGBUS, SignalExceptionHandler);
+    signal(SIGPIPE, SignalExceptionHandler);
+    
+    signal(SIGKILL, SignalExceptionHandler);
+     signal(SIGSEGV, SignalExceptionHandler);
+     signal(SIGALRM, SignalExceptionHandler);
+     signal(SIGTERM, SignalExceptionHandler);
+     signal(SIGCHLD, SignalExceptionHandler);
+     signal(SIGCONT, SignalExceptionHandler);
+     signal(SIGTSTP, SignalExceptionHandler);
+     signal(SIGSTOP, SignalExceptionHandler);
+     signal(SIGTTIN, SignalExceptionHandler);
+     signal(SIGXCPU, SignalExceptionHandler);
+     signal(SIGXFSZ, SignalExceptionHandler);
+     signal(SIGVTALRM, SignalExceptionHandler);
+     signal(SIGPROF, SignalExceptionHandler);
+     signal(SIGWINCH, SignalExceptionHandler);
+    signal(SIGIO, SignalExceptionHandler);
+    signal(SIGSYS, SignalExceptionHandler);
+}
+
+void HandleException(NSException *exception)
+{
+    // 异常的堆栈信息
+    NSArray *stackArray = [exception callStackSymbols];
+    // 出现异常的原因
+    NSString *reason = [exception reason];
+    // 异常名称
+    NSString *name = [exception name];
+    NSString *exceptionInfo = [NSString stringWithFormat:@"Exception reason：%@\nException name：%@\nException stack：%@",name, reason, stackArray];
+    NSLog(@"HandleException :%@", exceptionInfo);
+ 
+}
+
+void InstallUncaughtExceptionHandler(void)
+{
+    NSSetUncaughtExceptionHandler(&HandleException);
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {

@@ -70,7 +70,7 @@ static NSString*  injectObjectClass(NSString* prefixString,NSString* observerCla
 
 static SEL  injectObjectAddObserverSEL(NSString* prefixString,id observer,SEL sel);
 
-static NSArray<NSString*>* getObserverArgumentsType(NSObject* obj ,SEL aSelector);
+static int getObserverArgumentsCount(NSObject* obj ,SEL aSelector);
 
 - (void)lyz_inject_responseNotificationNoArg;
 - (void)lyz_inject_responseNotification:(NSNotification *)notification;
@@ -86,18 +86,18 @@ static void addObservierToNotificationCenter(id observer,NSString* aName,SEL aSe
     
     Method injectMethod = nil;
     
-    NSArray* argTypeList = getObserverArgumentsType(obj, aSeletor);
-    if(argTypeList.count == 2)
+    int argsCount = getObserverArgumentsCount(obj, aSeletor);
+    if(argsCount == 2)
     {
         injectMethod = class_getInstanceMethod([obj.injectObj class], @selector(lyz_inject_responseNotificationNoArg));
     }
     
-    if(argTypeList.count == 3)
+    if(argsCount == 3)
     {
         injectMethod = class_getInstanceMethod([obj.injectObj class], @selector(lyz_inject_responseNotification:));
     }
     
-    if(argTypeList.count == 4)
+    if(argsCount == 4)
     {
         injectMethod = class_getInstanceMethod([obj.injectObj class], @selector(lyz_inject_responseNotificationWithObj:obj:));
     }
@@ -106,28 +106,46 @@ static void addObservierToNotificationCenter(id observer,NSString* aName,SEL aSe
     {
         IMP    injectIMP = method_getImplementation(injectMethod);
         
+        BOOL methodIMPFlag = class_respondsToSelector([obj.injectObj class], injectSEL);
+        
         class_addMethod([obj.injectObj class], injectSEL, injectIMP, method_getTypeEncoding(injectMethod));
+        
+        methodIMPFlag = class_respondsToSelector([obj.injectObj class], injectSEL);
+        
+        NSLog(@"");
     }
     
     NSLog(@" addObservierToNotificationCenter \n observer:%@ \n postName:%@ \n observerSelector:%@ \n inject:%@ \n injectSEL:%@",obj,aName,NSStringFromSelector(aSeletor),obj.injectObj,NSStringFromSelector(injectSEL));
 }
 
-static NSArray<NSString*>* getObserverArgumentsType(NSObject* obj ,SEL aSelector)
+static int getObserverArgumentsCount(NSObject* obj ,SEL aSelector)
 {
-    NSMutableArray* argList = [NSMutableArray new];
-    // 获取方法的参数类型
-    Method responseMethod = class_getInstanceMethod([obj class], aSelector);
-    unsigned int argumentsCount = method_getNumberOfArguments(responseMethod);
-    for (unsigned int argCounter = 0; argCounter < argumentsCount; ++argCounter)
+//    NSMutableArray* argList = [NSMutableArray new];
+//    // 获取方法的参数类型
+//    Method responseMethod = class_getInstanceMethod([obj class], aSelector);
+//    unsigned int argumentsCount = method_getNumberOfArguments(responseMethod);
+//    for (unsigned int argCounter = 0; argCounter < argumentsCount; ++argCounter)
+//    {
+//        char* arg =  method_copyArgumentType(responseMethod, argCounter);
+//        NSString* argType = [NSString stringWithUTF8String:arg];
+//        if(argType)
+//        {
+//            [argList addObject:argType];
+//        }
+//    }
+    NSString* selString = NSStringFromSelector(aSelector);
+    NSRange subRange = NSMakeRange(0, 1);
+    int argsCount = 0;
+    for(int i = 0 ; i < selString.length; i++)
     {
-        char* arg =  method_copyArgumentType(responseMethod, argCounter);
-        NSString* argType = [NSString stringWithUTF8String:arg];
-        if(argType)
+        subRange.location = i;
+        NSString* subString = [selString substringWithRange:subRange];
+        if([subString isEqualToString:@":"])
         {
-            [argList addObject:argType];
+            argsCount ++;
         }
     }
-    return argList;
+    return argsCount + 1 + 1;
 }
 
 static NSString*  injectObjectPrefixString()
@@ -150,7 +168,7 @@ static SEL  injectObjectAddObserverSEL(NSString* prefixString,id observer,SEL se
     
     NSString* selString = NSStringFromSelector(sel);
     
-    NSUInteger argsCount = getObserverArgumentsType(observer, sel).count;
+    NSUInteger argsCount = getObserverArgumentsCount(observer, sel);
     NSString* injectSELString = nil;
     if(argsCount == 4)
     {
@@ -218,31 +236,47 @@ static SEL parseObserverSELWithInjectObserverSEL(GBLInjectObject* injectObj, SEL
     //此时self 指的是GBLInjectObject实例
     NSObject* objObserver = observer;
     SEL observerSEL = parseObserverSELWithInjectObserverSEL(objObserver.injectObj, cmd);
-    NSArray* argTypeList = getObserverArgumentsType(objObserver, observerSEL);
+    int argsCount = getObserverArgumentsCount(observer, observerSEL);
  
     Method observerMethod = class_getInstanceMethod([objObserver class], observerSEL);
     IMP observerMethodIMP = method_getImplementation(observerMethod);
     
-    NSLog(@"notificationResponse \n observer:%@ \n observerSEL:%@ \n notification:%@ \n inject:%@ \n injectCmd:%@ \n argList.count:%lu",objObserver,NSStringFromSelector(observerSEL),notification,objObserver.injectObj,NSStringFromSelector(cmd),(unsigned long)argTypeList.count);
+    NSLog(@"notificationResponse \n observer:%@ \n observerSEL:%@ \n notification:%@ \n inject:%@ \n injectCmd:%@ \n argList.count:%lu",objObserver,NSStringFromSelector(observerSEL),notification,objObserver.injectObj,NSStringFromSelector(cmd),(unsigned long)argsCount);
     
-    if(argTypeList.count == 2)
+    if(argsCount == 2)
     {
-        void (*func)(id, SEL) = (void *)observerMethodIMP;
+  
+//        if([NSStringFromSelector(observerSEL) isEqualToString:@"_willResume"])
+//        {
+//            void (*func)(id, SEL,NSNotification *) = (void *)observerMethodIMP;
+//            func(objObserver,observerSEL,notification);
+//        }else
+//        {
+            void (*func)(id, SEL) = (void *)observerMethodIMP;
+            NSLog(@"notificationResponse before");
+        if(func != NULL)
+        {
+        	func(objObserver,observerSEL);
+        }
+            //        [objObserver performSelector:observerSEL withObject:nil];
+            NSLog(@"notificationResponse after");
+//        }
         
-        NSLog(@"notificationResponse before");
-        func(objObserver,observerSEL);
-        NSLog(@"notificationResponse after");
-    }else if(argTypeList.count == 3)
+    }else if(argsCount == 3)
     {
-        
         void (*func)(id, SEL,NSNotification *) = (void *)observerMethodIMP;
-        func(objObserver,observerSEL,notification);
-        
-    }else if (argTypeList.count == 4)
+        if(func != NULL)
+        {
+        	 func(objObserver,observerSEL,notification);
+        }
+    }else if (argsCount == 4)
     {
         void (*func)(id, SEL,NSNotification *,id) = (void *)observerMethodIMP;
-
-        func(objObserver,observerSEL,notification,obj);
+		
+        if(func != NULL)
+        {
+        	func(objObserver,observerSEL,notification,obj);
+        }
     }
 }
 @end
@@ -272,13 +306,37 @@ static SEL parseObserverSELWithInjectObserverSEL(GBLInjectObject* injectObj, SEL
 - (void)lyz_removeObserver:(id)observer name:(NSNotificationName)aName object:(id)anObject
 {
     NSObject* obj = observer;
-    [self lyz_removeObserver:obj.injectObj name:aName object:anObject];
+    if([obj isKindOfClass:[GBLInjectObject class]])
+    {
+        [self lyz_removeObserver:obj name:aName object:anObject];
+    }else
+    {
+        if(obj.injectObj)
+        {
+            [self lyz_removeObserver:obj.injectObj name:aName object:anObject];
+        }else
+        {
+            [self lyz_removeObserver:obj name:aName object:anObject];
+        }
+    }
 }
 
 - (void)lyz_removeObserver:(id)observer
 {
     NSObject* obj = observer;
-    [self lyz_removeObserver:obj.injectObj];
+    if([obj isKindOfClass:[GBLInjectObject class]])
+    {
+        [self lyz_removeObserver:obj];
+    }else
+    {
+        if(obj.injectObj)
+        {
+            [self lyz_removeObserver:obj.injectObj];
+        }else
+        {
+            [self lyz_removeObserver:obj];
+        }
+    }
 }
 
 
@@ -311,6 +369,7 @@ static SEL parseObserverSELWithInjectObserverSEL(GBLInjectObject* injectObj, SEL
 //    BOOL flag_3 = [observer isKindOfClass:[TestObject_3 class]];
 //    BOOL flag_4 = [observer isKindOfClass:[TestObject_4 class]];
 //    if(flag || flag_1 || flag_2 || flag_3 || flag_4 || flagBase)
+//    if(![NSStringFromClass([observer class]) isEqualToString:@"UIMotionEvent"])
     if([observer isKindOfClass:[NSObject class]])
     {
         NSObject* obj = observer;
@@ -340,17 +399,6 @@ static SEL parseObserverSELWithInjectObserverSEL(GBLInjectObject* injectObj, SEL
          [self lyz_addObserver:observer selector:aSelector name:aName object:anObject];
     }
 }
-
-//void UncaughtExceptionHandler(NSException *exception)
-//{
-//    NSLog(@"exceptionName:%@",exception.name);
-//    NSLog(@"reason:%@",exception.reason);
-//    NSLog(@"userInfo:%@",exception.userInfo);
-//    NSLog(@"callStackReturnAddresses:%@",exception.callStackReturnAddresses);
-//    
-//    NSArray<NSString*>* callStackSymbols = exception.callStackSymbols;
-//    NSLog(@"callStackSymbols:%@",callStackSymbols);
-//}
 @end
 
 
